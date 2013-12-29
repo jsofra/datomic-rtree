@@ -1,0 +1,80 @@
+[
+   ;; bbox
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :bbox/min-x
+    :db/valueType :db.type/double
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :bbox/min-y
+    :db/valueType :db.type/double
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :bbox/max-x
+    :db/valueType :db.type/double
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :bbox/max-y
+    :db/valueType :db.type/double
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   ;; rtree
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :rtree/max-children
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :rtree/min-children
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :rtree/root
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/user]
+    :db/ident :rtree/construct
+    :db/fn #db/fn
+    {:lang "clojure"
+     :params [db e max-children min-children]
+     :code (let [root-id #db/id[:db.part/user]]
+             [{:db/id root-id
+               :node/is-leaf? true
+               :bbox/max-x (* (Double/MAX_VALUE) -1)
+               :bbox/min-x (Double/MAX_VALUE)
+               :bbox/max-y (* (Double/MAX_VALUE) -1)
+               :bbox/min-y (Double/MAX_VALUE)}
+              {:db/id e
+               :rtree/root root-id
+               :rtree/max-children max-children
+               :rtree/min-children min-children}])}}
+
+   ;; node
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :node/children
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/many
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :node/is-leaf?
+    :db/valueType :db.type/boolean
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}]
