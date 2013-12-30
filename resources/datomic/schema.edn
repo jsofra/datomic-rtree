@@ -65,7 +65,21 @@
                :rtree/max-children max-children
                :rtree/min-children min-children}])}}
 
+   {:db/id #db/id[:db.part/user]
+    :db/ident :rtree/insert-entry
+    :db/fn #db/fn
+    {:lang "clojure"
+     :requires [[meridian.datomic-rtree.rtree :as rtree]]
+     :params [db entry]
+     :code (rtree/insert-entry-tx (rtree/find-tree db) entry)}}
+
    ;; node
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :node/entry
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
 
    {:db/id #db/id[:db.part/db]
     :db/ident :node/children
