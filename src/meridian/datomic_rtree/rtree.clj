@@ -23,6 +23,14 @@
   (- (bbox-area (bbox-union enlarge with))
      (bbox-area enlarge)))
 
+(defn bbox-intersect? [bbox-a bbox-b]
+  (let [{amax-x :bbox/max-x amin-x :bbox/min-x
+         amax-y :bbox/max-y amin-y :bbox/min-y} bbox-a
+         {bmax-x :bbox/max-x bmin-x :bbox/min-x
+          bmax-y :bbox/max-y bmin-y :bbox/min-y} bbox-b]
+    (and (>= amax-x bmin-x) (<= amin-x bmax-x)
+         (>= amax-y bmin-y) (<= amin-y bmax-y))))
+
 (defn enlargement-fn [with]
   (fn [enlarge] (bbox-enlargement enlarge with)))
 
@@ -164,15 +172,16 @@
   ([max-children min-children]
      [[:rtree/construct #db/id[:db.part/user] max-children min-children]]))
 
-(defn create-and-connect-db [uri schema]
-  (d/delete-database uri)
-  (d/create-database uri)
-  (let [conn (d/connect uri)]
-    (->> (read-string (slurp schema))
-       (d/transact conn))
-    (d/transact conn (create-tree))
-    ;(install-test-data conn)
-    conn))
+(defn create-and-connect-db
+  ([uri schema] (create-and-connect-db uri schema 50 20))
+  ([uri schema max-children min-children]
+     (d/delete-database uri)
+     (d/create-database uri)
+     (let [conn (d/connect uri)]
+       (->> (read-string (slurp schema))
+            (d/transact conn))
+       (d/transact conn (create-tree max-children min-children))
+       conn)))
 
 (defn install-test-data [conn]
   (let [test-data [[[0.0 0.0 10.0 10.0] "a"]
@@ -197,6 +206,11 @@
 ;(def conn (create-and-connect-db uri "resources/datomic/schema.edn"))
 ;(install-test-data conn)
 ;(->> (find-tree (d/db conn)) :rtree/root :node/children)
+;(time (count (d/q '[:find ?e :in $ :where [?e :node/entry] [(datomic.api/entity $ ?e) ?b] [(meridian.datomic-rtree.rtree/bbox-intersect? (meridian.datomic-rtree.rtree/bbox-extents 0.0 0.0 100.0 100.0) ?b)]] (d/db conn))))
+;(time (count (d/q search (d/db conn) rules (bbox-extents 0.0 0.0 100.0 100.0))))
+;(time (count (intersects? (:rtree/root (find-tree (d/db conn))) (bbox-extents 0.0 0.0 100.0 100.0))))
+
+
 
 (defn print-tree [conn]
   (let [root (:rtree/root (find-tree (d/db conn)))]
@@ -205,3 +219,31 @@
        (doseq [c (:node/children n)]
          (walk c (str indent "---"))))
      root "")))
+
+(defn intersects? [root bbox]
+  ((fn step [node]
+         (let [children (filter #(bbox-intersect? bbox %) (:node/children node))]
+           (if (:node/is-leaf? node)
+             children
+             (concat (mapcat step children))))) root))
+
+(def rules '[[(parent ?a ?b)
+              [?a :node/children ?b]]
+             [(ancestor ?a ?b)
+              [parent ?a ?b]]
+             [(ancestor ?a ?b)
+              [parent ?a ?x]
+              [ancestor ?x ?b]]
+             [(intersects ?e ?search-box)
+              [ancestor ?x ?e]
+              [?z :rtree/root ?x]
+              #_[intersects ?x ?search-box]]
+             [(intersects ?e ?search-box)
+              [(datomic.api/entity $ ?e) ?eb]
+              [(meridian.datomic-rtree.rtree/bbox-intersect? ?eb ?search-box)]]
+             ])
+
+(def search '[:find ?e :in $ % ?b
+              :where
+              [?e :node/entry]
+              [intersects ?e ?b]])
