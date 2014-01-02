@@ -18,7 +18,6 @@
                   (sort-by (juxt (bbox/enlargement-fn new-bbox) bbox/area))
                   first)))))
 
-
 (defn pick-seeds
   "Select two entries to be the first elements of the new groups.
    Choose the most wasteful (in terms of area) pair."
@@ -116,17 +115,36 @@
           (recur parent node (or split #{}) txs)
           txs)))))
 
+(defn create-tree-tx [max-children min-children]
+  [[:rtree/construct #db/id[:db.part/user] max-children min-children]])
+
+;; basic search functions
+
+
+(defn search-tree [root search-box pred]
+  ((fn step [node]
+         (let [children (filter #(pred search-box %) (:node/children node))]
+           (if (:node/is-leaf? node)
+             children
+             (mapcat #(lazy-seq (step %)) children)))) root))
+
+(defn intersecting
+  "Given the root of the tree and a bounding box to search within find intersecting entries."
+  [root search-box]
+  (search-tree root search-box bbox/intersects?))
+
+(defn containing
+  "Given the root of the tree and a bounding box to search within find entries contained within
+   the search box."
+  [root search-box]
+  (search-tree root search-box bbox/contains?))
+
 
 (def uri "datomic:mem://rtrees")
 
 (defn find-tree [db]
   (->> (d/q '[:find ?e :where [?e :rtree/root]] db)
        ffirst (d/entity db)))
-
-(defn create-tree
-  ([] (create-tree 50 20))
-  ([max-children min-children]
-     [[:rtree/construct #db/id[:db.part/user] max-children min-children]]))
 
 (defn create-and-connect-db
   ([uri schema] (create-and-connect-db uri schema 50 20))
@@ -136,7 +154,7 @@
      (let [conn (d/connect uri)]
        (->> (read-string (slurp schema))
             (d/transact conn))
-       (d/transact conn (create-tree max-children min-children))
+       (d/transact conn (create-tree-tx max-children min-children))
        conn)))
 
 (defn install-test-data [conn]
@@ -175,13 +193,6 @@
        (doseq [c (:node/children n)]
          (walk c (str indent "---"))))
      root "")))
-
-(defn intersects? [root bbox]
-  ((fn step [node]
-         (let [children (filter #(bbox/intersect? bbox %) (:node/children node))]
-           (if (:node/is-leaf? node)
-             children
-             (concat (mapcat step children))))) root))
 
 (def rules '[[(parent ?a ?b)
               [?a :node/children ?b]]

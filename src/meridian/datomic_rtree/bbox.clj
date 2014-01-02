@@ -20,13 +20,21 @@
   (- (area (union enlarge with))
      (area enlarge)))
 
-(defn intersect? [bbox-a bbox-b]
+(defn intersects? [bbox-a bbox-b]
   (let [{amax-x :bbox/max-x amin-x :bbox/min-x
          amax-y :bbox/max-y amin-y :bbox/min-y} bbox-a
          {bmax-x :bbox/max-x bmin-x :bbox/min-x
           bmax-y :bbox/max-y bmin-y :bbox/min-y} bbox-b]
     (and (>= amax-x bmin-x) (<= amin-x bmax-x)
          (>= amax-y bmin-y) (<= amin-y bmax-y))))
+
+(defn contains? [bbox-a bbox-b]
+  (let [{amax-x :bbox/max-x amin-x :bbox/min-x
+         amax-y :bbox/max-y amin-y :bbox/min-y} bbox-a
+         {bmax-x :bbox/max-x bmin-x :bbox/min-x
+          bmax-y :bbox/max-y bmin-y :bbox/min-y} bbox-b]
+    (and (>= amax-x bmax-x) (<= amin-x bmin-x)
+         (>= amax-y bmax-y) (<= amin-y bmin-y))))
 
 (defn enlargement-fn [with]
   (fn [enlarge] (enlargement enlarge with)))
