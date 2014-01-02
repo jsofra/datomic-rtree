@@ -70,8 +70,8 @@
     :db/fn #db/fn
     {:lang "clojure"
      :requires [[meridian.datomic-rtree.rtree :as rtree]]
-     :params [db entry]
-     :code (rtree/insert-entry-tx (rtree/find-tree db) entry)}}
+     :params [db tree entry]
+     :code (rtree/insert-entry-tx tree entry)}}
 
    ;; node
 
