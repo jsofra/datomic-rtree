@@ -23,7 +23,7 @@ This is Currently only a exploration of the idea, there is a lot more to do.
 
 ## Usage
 
-Nothing much to show yet but you can see some example code in a scratch namespace [here](http://github.com/jsofra/datomic-rtree/examples/mem_tree.clj).
+Nothing much to show yet but you can see some example code in a scratch namespace [here](https://github.com/jsofra/datomic-rtree/blob/master/examples/mem_tree.clj).
 
 ## License
 
