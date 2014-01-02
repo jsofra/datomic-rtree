@@ -1,53 +1,23 @@
 (ns meridian.datomic-rtree.rtree
   (:use [datomic.api :only (q db) :as d])
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [meridian.datomic-rtree.bbox :as bbox])
   (:import datomic.Util))
 
-(defn bbox-extents [x1 y1 x2 y2]
-  {:bbox/max-x (max x1 x2) :bbox/min-x (min x1 x2)
-   :bbox/max-y (max y1 y2) :bbox/min-y (min y1 y2)})
-
-(defn bbox-area [{max-x :bbox/max-x min-x :bbox/min-x
-                  max-y :bbox/max-y min-y :bbox/min-y}]
-  (* (- max-x min-x) (- max-y min-y)))
-
-(defn bbox-union [bbox-a bbox-b]
-  (let [{amax-x :bbox/max-x amin-x :bbox/min-x
-         amax-y :bbox/max-y amin-y :bbox/min-y} bbox-a
-         {bmax-x :bbox/max-x bmin-x :bbox/min-x
-          bmax-y :bbox/max-y bmin-y :bbox/min-y} bbox-b]
-    (bbox-extents (max amax-x bmax-x) (max amax-y bmax-y)
-                  (min amin-x bmin-x) (min amin-y bmin-y))))
-
-(defn bbox-enlargement [enlarge with]
-  (- (bbox-area (bbox-union enlarge with))
-     (bbox-area enlarge)))
-
-(defn bbox-intersect? [bbox-a bbox-b]
-  (let [{amax-x :bbox/max-x amin-x :bbox/min-x
-         amax-y :bbox/max-y amin-y :bbox/min-y} bbox-a
-         {bmax-x :bbox/max-x bmin-x :bbox/min-x
-          bmax-y :bbox/max-y bmin-y :bbox/min-y} bbox-b]
-    (and (>= amax-x bmin-x) (<= amin-x bmax-x)
-         (>= amax-y bmin-y) (<= amin-y bmax-y))))
-
-(defn enlargement-fn [with]
-  (fn [enlarge] (bbox-enlargement enlarge with)))
-
-(defn choose-leaf-path
+(defn choose-leaf
   "Select a leaf node in which to place a new index entry, new-bbox.
    Starts at the root node a works down the tree.
    Chooses a leaf node whose path to the root consists of ancestors nodes
    that all required the least enlargement to include new-bbox, or have
    the smallest area."
   [root new-bbox]
-  (loop [path [root]]
-    (if (:node/is-leaf? (last path))
-      path
-      (recur (->> (:node/children (last path))
-                  (sort-by (juxt (enlargement-fn new-bbox) bbox-area))
-                  first
-                  (conj path))))))
+  (loop [n root]
+    (if (:node/is-leaf? n)
+      n
+      (recur (->> (:node/children n)
+                  (sort-by (juxt (bbox/enlargement-fn new-bbox) bbox/area))
+                  first)))))
+
 
 (defn pick-seeds
   "Select two entries to be the first elements of the new groups.
@@ -55,29 +25,30 @@
   [entries]
   (let [pairs (for [x entries y entries :when (not= x y)] [x y])
         innefficiency (fn [[e1 e2]]
-                        (- (bbox-area (bbox-union e1 e2))
-                           (bbox-area e1)
-                           (bbox-area e2)))]
+                        (- (bbox/area (bbox/union e1 e2))
+                           (bbox/area e1)
+                           (bbox/area e2)))]
     (apply max-key innefficiency pairs)))
-
-(defn group-bbox [group] (reduce bbox-union group))
 
 (defn pick-next [group-a group-b nodes]
   "Select one remaining entry for classification in a group.
    Determine te cost of putting each entry in each group.
    Find the entry with greatest preference for one group."
-  (let [bboxes (map group-bbox [group-a group-b])
+  (let [bboxes (map bbox/group [group-a group-b])
         cost-diff (fn [node]
-                    (let [enlargements (map (enlargement-fn node) bboxes)]
+                    (let [enlargements (map (bbox/enlargement-fn node) bboxes)]
                       (Math/abs (apply - enlargements))))]
     (apply max-key cost-diff nodes)))
 
 (defn group-chooser [node]
   (fn [group]
-    (let [bbox (group-bbox group)]
-      [(bbox-enlargement bbox node) (bbox-area bbox) (count group)])))
+    (let [bbox (bbox/group group)]
+      [(bbox/enlargement bbox node) (bbox/area bbox) (count group)])))
 
 (defn split-node [children min-children]
+  "Quadractic-Cost Algorithm. Attempts to find a small-area split.
+   Given a set of children (and a minimum number of children allowed in a node),
+   returns a vector containing two new sets of child nodes."
   (let [[seed-a seed-b] (pick-seeds children)]
     (loop [groups [#{seed-a} #{seed-b}]
            remaining (disj children seed-a seed-b)]
@@ -91,75 +62,60 @@
               (recur [(conj first-group picked) second-group]
                      (disj remaining picked)))))))))
 
-(defn bbox-adjustments [path entry]
-  (map (juxt identity (partial bbox-union entry)) path))
-
-(defn split-adjustments [path entry min-children id-adder]
-  (rest (reductions
-         (fn [[old-child new-children] node]
-           (let [split-children (-> (:node/children node)
-                                    (disj old-child)
-                                    (clojure.set/union (set new-children))
-                                    (split-node min-children))
-                 bboxes (map (comp id-adder group-bbox) split-children)]
-             [node (map #(assoc %1 :node/children %2) bboxes split-children)]))
-         [nil #{entry}] path)))
-
-(defn tree-adjustments [path-from-leaf entry id-adder
-                        {max-children :rtree/max-children
-                         min-children :rtree/min-children}]
-  (let [split? #(= (count (:node/children %)) max-children)]
-    {:bbox-adj (bbox-adjustments (drop-while split? path-from-leaf) entry)
-     :split-adj (split-adjustments (take-while split? path-from-leaf)
-                                           entry min-children id-adder)}))
-
 ;; convert the tree adjustments into transactions
-
-(defn bbox-adj-tx [bbox-adj new-entry]
-  (for [[node bbox] bbox-adj]
-       (cond-> (assoc bbox :db/id (:db/id node))
-               (:node/is-leaf? node) (assoc :node/children #{(:db/id new-entry)}))))
 
 (defn node-ids [nodes] (set (map :db/id nodes)))
 
-(defn split-adj-tx [split-adj]
-  (mapcat
-   (fn [[node split]]
-     (let [split (map #(merge (select-keys node [:node/is-leaf?]) %) split)]
-       (conj (map #(assoc % :node/children (node-ids (:node/children %))) split)
-             [:db.fn/retractEntity (:db/id node)])))
-          split-adj))
-
-(defn grow-tree-tx [tree-id split-adj]
-  (let [[_ split] (last split-adj)
-        new-root-id #db/id[:db.part/user]]
-    [[:db/add tree-id :rtree/root new-root-id]
-     (merge (group-bbox split)
-            {:db/id new-root-id :node/children (node-ids split)})]))
-
-(defn connect-adj-tx [bbox-adj split-adj]
-  (let [[_ split] (last split-adj)]
-    [[:db/add (:db/id (ffirst bbox-adj)) :node/children (node-ids split)]]))
-
 (defn add-id [node] (assoc node :db/id (d/tempid :db.part/user)))
+
+(defn new-splits [node old-child new-children min-children id-adder]
+  (let [split-children (-> (:node/children node)
+                           (disj old-child)
+                           (clojure.set/union (set new-children))
+                           (split-node min-children))
+        bboxes (map (comp id-adder bbox/group) split-children)]
+    (map #(assoc %1 :node/children %2) bboxes split-children)))
+
+(defn adjusted-node [node entry new-children]
+  (cond-> (assoc (bbox/union entry node) :db/id (:db/id node))
+          (seq new-children) (assoc :node/children (node-ids new-children))))
+
+(defn split-tx [node split]
+  (let [split (map #(merge (select-keys node [:node/is-leaf?]) %) split)]
+    (conj (map #(assoc % :node/children (node-ids (:node/children %))) split)
+          [:db.fn/retractEntity (:db/id node)])))
+
+(defn node-op [node prev-node split-nodes entry
+               {max-children :rtree/max-children min-children :rtree/min-children}]
+  (if (and (= (count (:node/children node)) max-children) (seq split-nodes))
+    {:split (new-splits node prev-node split-nodes min-children add-id)}
+    {:adjust (adjusted-node node entry split-nodes)}))
+
+(defn grow-tree-tx [tree-id split]
+  (let [new-root-id #db/id[:db.part/user]]
+    [[:db/add tree-id :rtree/root new-root-id]
+     (merge (bbox/group split)
+            {:db/id new-root-id :node/children (node-ids split)})]))
 
 (defn insert-entry-tx [tree entry]
   (let [new-entry (add-id entry)
-        {:keys [bbox-adj split-adj]}
-        (-> (:rtree/root tree)
-            (choose-leaf-path new-entry)
-            reverse
-            (tree-adjustments new-entry add-id tree))]
-    (concat
-     [new-entry]
+        leaf (-> (:rtree/root tree)
+                 (choose-leaf new-entry))]
+    (loop [node leaf
+           prev-node nil
+           split-nodes #{new-entry}
+           txs [new-entry]]
+      (let [parent (first (:node/_children node))
+            {:keys [split adjust]} (node-op node prev-node split-nodes new-entry tree)
+            txs (if split
+                  (concat txs (split-tx node split)
+                          (when (nil? parent)
+                            (grow-tree-tx (:db/id tree) split)))
+                  (conj txs adjust))]
+        (if parent
+          (recur parent node (or split #{}) txs)
+          txs)))))
 
-     (if (empty? bbox-adj)
-       (grow-tree-tx (:db/id tree) split-adj)
-       (when (seq split-adj)
-         (connect-adj-tx bbox-adj split-adj)))
-
-     (bbox-adj-tx bbox-adj new-entry)
-     (split-adj-tx split-adj))))
 
 (def uri "datomic:mem://rtrees")
 
@@ -192,23 +148,23 @@
                    [[-100.0 -50.0 5.0 5.0] "f"]
                    [[-1.0 -5.0 50.0 50.0] "g"]
                    [[1.0 1.0 8.0 8.0] "h"]]]
-    (doseq [[bbox entry] test-data]
+    (doseq [[box entry] test-data]
       (d/transact conn [[:rtree/insert-entry
-                         (assoc (apply bbox-extents bbox) :node/entry entry)]]))))
+                         (assoc (apply bbox/extents box) :node/entry entry)]]))))
 
 (defn install-rand-data [conn num-entries]
   (let [test-data (into [] (take num-entries (partition 4 (repeatedly #(rand 500)))))]
-    (time (doseq [bbox test-data]
+    (time (doseq [box test-data]
             (d/transact conn [[:rtree/insert-entry
-                               (assoc (apply bbox-extents bbox)
+                               (assoc (apply bbox/extents box)
                                  :node/entry (str (char (rand-int 200))))]])))))
 
 ;(def conn (create-and-connect-db uri "resources/datomic/schema.edn"))
 ;(install-test-data conn)
 ;(->> (find-tree (d/db conn)) :rtree/root :node/children)
-;(time (count (d/q '[:find ?e :in $ :where [?e :node/entry] [(datomic.api/entity $ ?e) ?b] [(meridian.datomic-rtree.rtree/bbox-intersect? (meridian.datomic-rtree.rtree/bbox-extents 0.0 0.0 100.0 100.0) ?b)]] (d/db conn))))
+;(time (count (d/q '[:find ?e :in $ :where [?e :node/entry] [(datomic.api/entity $ ?e) ?b] [(meridian.datomic-rtree.bbox/intersect? (meridian.datomic-rtree.bbox/extents 0.0 0.0 100.0 100.0) ?b)]] (d/db conn))))
 ;(time (count (d/q search (d/db conn) rules (bbox-extents 0.0 0.0 100.0 100.0))))
-;(time (count (intersects? (:rtree/root (find-tree (d/db conn))) (bbox-extents 0.0 0.0 100.0 100.0))))
+;(time (count (intersects? (:rtree/root (find-tree (d/db conn))) (bbox/extents 0.0 0.0 100.0 100.0))))
 
 
 
@@ -222,7 +178,7 @@
 
 (defn intersects? [root bbox]
   ((fn step [node]
-         (let [children (filter #(bbox-intersect? bbox %) (:node/children node))]
+         (let [children (filter #(bbox/intersect? bbox %) (:node/children node))]
            (if (:node/is-leaf? node)
              children
              (concat (mapcat step children))))) root))
