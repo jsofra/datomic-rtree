@@ -52,15 +52,36 @@
          (walk c (str indent "---"))))
      root "")))
 
+
+(defn all-entries [db]
+  (map #(d/entity db (first %))
+       (d/q '[:find ?e :where [?e :node/entry]] db)))
+
+(defn nieve-intersecting [entries search-box]
+  (into [] (filter #(bbox/intersects? search-box %) entries)))
+
+(def search-rules
+  '[[(intersecting ?ancestor ?descendant ?search-box)
+     [?ancestor :node/children ?descendant]
+     [(datomic.api/entity $ ?descendant) ?e]
+     [(meridian.datomic-rtree.bbox/intersects? ?e ?search-box)]]
+    [(intersecting ?ancestor ?descendant ?search-box)
+     [?ancestor :node/children ?child]
+     [intersecting ?child ?descendant ?search-box]]])
+
+(def intersecting-q
+  '[:find ?e
+    :in $ % ?root ?bbox
+    :where
+    [intersecting ?root ?e ?bbox]
+    [?e :node/entry]])
+
 (comment
   (def conn (create-and-connect-db uri "resources/datomic/schema.edn" 6 3))
   (install-rand-data conn 1000)
-  (time (count (d/q '[:find ?e
-                      :in $
-                      :where
-                      [?e :node/entry]
-                      [(datomic.api/entity $ ?e) ?b]
-                      [(meridian.datomic-rtree.bbox/intersects?
-                        (meridian.datomic-rtree.bbox/extents 0.0 0.0 100.0 100.0) ?b)]] (d/db conn))))
-  (time (count (rtree/intersecting (:rtree/root (find-tree (d/db conn)))
-                                   (bbox/extents 0.0 0.0 100.0 100.0)))))
+  (def search-box (bbox/extents 0.0 0.0 10.0 10.0))
+  (def root (:rtree/root (find-tree (d/db conn))))
+  (time (count (nieve-intersecting (all-entries (d/db conn)) search-box)))
+  (time (count (rtree/intersecting root search-box)))
+  (time (count (d/q intersecting-q (d/db conn) search-rules (:db/id root) search-box)))
+  )
