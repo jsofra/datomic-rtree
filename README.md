@@ -13,17 +13,18 @@ The implementation is a fairly vanilla implementation from the original Antonin 
 
 ## Todo
 
-This is Currently only a exploration of the idea, there is a lot more to do.
+This is currently only a exploration of the idea, there is a lot more to do.
 
 * Retractions and updates
 * Bulk-loading and/or batch insertion; Individual transactions for each insertion is quite slow
 * More search and query support
 * Investigate other R-trees; R* tree, R+ tree
 * Schema for supporting insertion of Meridian [Shapes](http://github.com/jsofra/shapes) and [Features](http://github.com/jsofra/features)
+* And lots, lots more.
 
 ## Usage
 
-Nothing much to show yet but you can see some example code in a scratch namespace [here](http://github.com/jsofra/datomic-rtree/examples/mem_tree.clj).
+Nothing much to show yet but you can see some example code in a scratch namespace [here](https://github.com/jsofra/datomic-rtree/blob/master/examples/mem_tree.clj).
 
 ## License
 
