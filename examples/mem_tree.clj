@@ -57,7 +57,7 @@
   (map #(d/entity db (first %))
        (d/q '[:find ?e :where [?e :node/entry]] db)))
 
-(defn nieve-intersecting [entries search-box]
+(defn naive-intersecting [entries search-box]
   (into [] (filter #(bbox/intersects? search-box %) entries)))
 
 (def search-rules
@@ -81,7 +81,7 @@
   (install-rand-data conn 1000)
   (def search-box (bbox/extents 0.0 0.0 10.0 10.0))
   (def root (:rtree/root (find-tree (d/db conn))))
-  (time (count (nieve-intersecting (all-entries (d/db conn)) search-box)))
+  (time (count (naive-intersecting (all-entries (d/db conn)) search-box)))
   (time (count (rtree/intersecting root search-box)))
   (time (count (d/q intersecting-q (d/db conn) search-rules (:db/id root) search-box)))
   )
