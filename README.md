@@ -1,10 +1,29 @@
-# datomic-gis
+# datomic-rtree
 
-A Clojure library designed to ... well, that part is up to you.
+An R-tree based spatial indexer for Datomic.
+
+The intention is for the R-tree to be implemented in Datomic itself.
+
+Currently single entry insertion has been implemented. A database function is provided that producess the correct transactions to build up the tree on entry insertion.
+
+A couple of simple search functions have been implemented but I have not decided how they will work with queries yet.
+
+The implementation is a fairly vanilla implementation from the original Antonin Guttman paper:
+[R-trees: a Dynamic Index Structure For Spatial Searching](http://www-db.deis.unibo.it/courses/SI-LS/papers/Gut84.pdf)
+
+## Todo
+
+This is Currently only a exploration of the idea, there is a lot more to do.
+
+* Retractions and updates
+* Bulk-loading and/or batch insertion; Individual transactions for each insertion is quite slow
+* More search and query support
+* Investigate other R-trees; R* tree, R+ tree
+* Schema for supporting insertion of Meridian [Shapes](http://github.com/jsofra/shapes) and [Features](http://github.com/jsofra/features)
 
 ## Usage
 
-FIXME
+Nothing much to show yet but you can see some example code in a scratch namespace [here](http://github.com/jsofra/datomic-rtree/examples/mem_tree.clj).
 
 ## License
 
