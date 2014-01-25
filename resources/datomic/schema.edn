@@ -73,11 +73,27 @@
      :params [db tree entry]
      :code (rtree/insert-entry-tx tree entry)}}
 
+   {:db/id #db/id[:db.part/user]
+    :db/ident :rtree/bulk-load
+    :db/fn #db/fn
+    {:lang "clojure"
+     :requires [[meridian.datomic-rtree.bbox :as bbox]
+                [meridian.datomic-rtree.bulk :as bulk]]
+     :params [db ents tree-id max-children min-children]
+     :code (bulk/bulk-tx ents tree-id max-children min-children bbox/area)}}
+
    ;; node
 
    {:db/id #db/id[:db.part/db]
     :db/ident :node/entry
     :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :node/hilbert-val
+    :db/index true
+    :db/valueType :db.type/double
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
