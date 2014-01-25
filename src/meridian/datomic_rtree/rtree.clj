@@ -29,7 +29,7 @@
 
 (defn pick-next [group-a group-b nodes]
   "Select one remaining entry for classification in a group.
-   Determine te cost of putting each entry in each group.
+   Determine the cost of putting each entry in each group.
    Find the entry with greatest preference for one group."
   (let [bboxes (map bbox/group [group-a group-b])
         cost-diff (fn [node]
@@ -63,7 +63,7 @@
 
 (defn node-ids [nodes] (set (map :db/id nodes)))
 
-(defn add-id [node] (assoc node :db/id (d/tempid :db.part/user)))
+(defn add-id [node] (assoc (into {} node) :db/id (d/tempid :db.part/user)))
 
 (defn new-splits [node old-child new-children min-children id-adder]
   (let [split-children (-> (:node/children node)
@@ -89,7 +89,7 @@
     {:adjust (adjusted-node node entry split-nodes)}))
 
 (defn grow-tree-tx [tree-id split]
-  (let [new-root-id #db/id[:db.part/user]]
+  (let [new-root-id (d/tempid :db.part/user)]
     [[:db/add tree-id :rtree/root new-root-id]
      (merge (bbox/group split)
             {:db/id new-root-id :node/children (node-ids split)})]))
@@ -118,21 +118,37 @@
 
 ;; basic search functions
 
+(defn- recur-search-step [node children recur-fn]
+  (if (:node/is-leaf? node)
+   children
+   (mapcat #(lazy-seq (recur-fn %)) children)))
 
-(defn search-tree [root search-box pred]
-  ((fn step [node]
-     (let [children (filter #(pred search-box %) (:node/children node))]
-       (if (:node/is-leaf? node)
-         children
-         (mapcat #(lazy-seq (step %)) children)))) root))
+(defn search-tree
+  ([root child-filter] (search-tree root child-filter recur-search-step))
+  ([root child-filter recur-step]
+     ((fn step [node]
+        (let [children (child-filter (:node/children node))]
+          (recur-step node children step))) root)))
 
 (defn intersecting
-  "Given the root of the tree and a bounding box to search within find intersecting entries."
+  "Given the root of the tree and a bounding box to search within finds entries
+   intersecting the search box."
   [root search-box]
-  (search-tree root search-box bbox/intersects?))
+  (search-tree root
+               (fn [children]
+                 (filter #(bbox/intersects? search-box %) children))))
 
-(defn containing
-  "Given the root of the tree and a bounding box to search within find entries contained within
-   the search box."
-  [root search-box]
-  (search-tree root search-box bbox/contains?))
+(defn containing [root search-box]
+  "Given the root of the tree and a bounding box to search within finds entries
+   contained within the search box."
+  (search-tree root
+               (fn [children]
+                 (filter #(bbox/contains? search-box %) children))
+                (fn [node children recur-fn]
+                  (if (= (count children) (count (:node/children node)))
+                    (search-tree node identity)
+                    recur-search-step))))
+
+(defn hilbert-ents [db]
+  (->> (d/seek-datoms db :avet :node/hilbert-val)
+       (map #(d/entity db (:e %)))))
