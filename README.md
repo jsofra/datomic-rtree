@@ -11,12 +11,14 @@ A couple of simple search functions have been implemented but I have not decided
 The implementation is a fairly vanilla implementation from the original Antonin Guttman paper:
 [R-trees: a Dynamic Index Structure For Spatial Searching](http://www-db.deis.unibo.it/courses/SI-LS/papers/Gut84.pdf)
 
+There is also an implementation of a parallel bulk-loading scheme using hilbert curves and a scoring mechanism similar to the one found in [Sort-based Parallel Loading of R-trees](http://www.mathematik.uni-marburg.de/~achakeye/publications/big_spatial_2012.pdf).
+
 ## Todo
 
 This is currently only a exploration of the idea, there is a lot more to do.
 
 * Retractions and updates
-* Bulk-loading and/or batch insertion; Individual transactions for each insertion is quite slow
+* Batch insertions
 * More search and query support
 * Investigate other R-trees; R* tree, R+ tree
 * Schema for supporting insertion of Meridian [Shapes](http://github.com/jsofra/shapes) and [Features](http://github.com/jsofra/features)
