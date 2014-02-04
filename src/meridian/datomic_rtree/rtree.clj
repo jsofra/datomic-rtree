@@ -4,10 +4,9 @@
 
 (defn choose-leaf
   "Select a leaf node in which to place a new index entry, new-bbox.
-   Starts at the root node a works down the tree.
-   Chooses a leaf node whose path to the root consists of ancestors nodes
-   that all required the least enlargement to include new-bbox, or have
-   the smallest area."
+   Starts at the root node a works down the tree. Finds the node whose
+   path to the root consists of ancestors nodes that all required the
+   least enlargement to include new-bbox, or have the smallest area."
   [root new-bbox]
   (loop [n root]
     (if (:node/is-leaf? n)
