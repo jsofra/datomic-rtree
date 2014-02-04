@@ -38,26 +38,25 @@
                           (find-tree (d/db conn))
                           (assoc (apply bbox/extents box) :node/entry entry)]]))))
 
-(defn install-rand-data [conn num-entries]
+(defn rand-entries []
   (let [hilbert-index (hilbert/index-fn 28 [0.0 500.0])
-        test-data (into [] (take num-entries (partition 4 (repeatedly #(rand 500)))))]
-    (time (doseq [[x1 y1 x2 y2 :as box] test-data]
-            @(d/transact conn [[:rtree/insert-entry
-                                (find-tree (d/db conn))
-                                (merge (apply bbox/extents box)
-                                       {:node/entry (str (char (rand-int 200)))})]])))))
+        rects (partition 4 (repeatedly #(rand 500)))]
+    (->> (partition 4 (repeatedly #(rand 500)))
+         (map (fn [[x1 y1 x2 y2 :as box]]
+                (merge (apply bbox/extents box)
+                       {:node/entry (str (char (+ (rand-int 25) 65)))
+                        :node/hilbert-val (hilbert-index [(* 0.5 (+ x1 x2))
+                                                          (* 0.5 (+ y1 y2))])}))))))
 
+(defn install-rand-data [conn num-entries]
+  (let [test-data (take num-entries (rand-entries))]
+    (time (doseq [entry test-data]
+            @(d/transact conn [[:rtree/insert-entry (find-tree (d/db conn)) entry]])))
+    :done))
 
 (defn install-rand-ents [conn num-entries]
-  (let [hilbert-index (hilbert/index-fn 28 [0.0 500.0])
-        test-data (->> (take num-entries (partition 4 (repeatedly #(rand 500))))
-                       (map (fn [[x1 y1 x2 y2 :as box]]
-                              (merge (apply bbox/extents box)
-                                     {:node/entry (str (char (rand-int 200)))
-                                      :db/id (d/tempid :db.part/user)
-                                      :node/hilbert-val (hilbert-index
-                                                         [(* 0.5 (+ x1 x2))
-                                                          (* 0.5 (+ y1 y2))])}))))]
+  (let [test-data (mapv #(assoc % :db/id (d/tempid :db.part/user))
+                        (take num-entries (rand-entries)))]
     (time @(d/transact conn test-data))
     :done))
 
@@ -68,6 +67,10 @@
        (doseq [c (:node/children n)]
          (walk c (str indent "---"))))
      root "")))
+
+(defn install-and-print-tree [conn num-entries]
+  (install-rand-data conn num-entries)
+  (print-tree conn))
 
 (defn all-entries [db]
   (map #(d/entity db (first %))
