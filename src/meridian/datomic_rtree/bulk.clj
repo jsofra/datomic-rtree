@@ -43,7 +43,7 @@
 (defn create-levels [ents partition-fn max-children]
   (let [leaves (partition-fn ents)]
     (loop [levels [leaves] leaves? true]
-      (let [ node #(cond-> (create-node %)
+      (let [node #(cond-> (create-node %)
                           leaves? (assoc :node/is-leaf? true))
             nodes (map node (last levels))]
         (if (> (count nodes) max-children)
