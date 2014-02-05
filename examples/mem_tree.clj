@@ -1,5 +1,6 @@
 (ns mem-tree
-  (:use [datomic.api :only (q db) :as d])
+  (:use [datomic.api :only (q db) :as d]
+        quil.core)
   (:require [clojure.java.io :as io]
             [meridian.datomic-rtree.rtree :as rtree]
             [meridian.datomic-rtree.bbox :as bbox]
@@ -39,14 +40,12 @@
                           (assoc (apply bbox/extents box) :node/entry entry)]]))))
 
 (defn rand-entries []
-  (let [hilbert-index (hilbert/index-fn 28 [0.0 500.0])
-        rects (partition 4 (repeatedly #(rand 500)))]
-    (->> (partition 4 (repeatedly #(rand 500)))
-         (map (fn [[x1 y1 x2 y2 :as box]]
-                (merge (apply bbox/extents box)
+  (let [hilbert-index (hilbert/index-fn 28 [0.0 600.0])]
+    (->> (repeatedly #(bbox/bbox (rand 550) (rand 550) (rand 50) (rand 50)))
+         (map (fn [box]
+                (merge box
                        {:node/entry (str (char (+ (rand-int 25) 65)))
-                        :node/hilbert-val (hilbert-index [(* 0.5 (+ x1 x2))
-                                                          (* 0.5 (+ y1 y2))])}))))))
+                        :node/hilbert-val (hilbert-index (bbox/centre box))}))))))
 
 (defn install-rand-data [conn num-entries]
   (let [test-data (take num-entries (rand-entries))]
@@ -115,3 +114,43 @@
   (time (count (d/q intersecting-q (d/db conn) search-rules (:db/id root) search-box)))
   (time (install-and-bulk-load conn 10000))
   )
+
+;;;;;; draw tree with quill ;;;;;;
+
+(defn all-bbox [db]
+  (map #(d/entity db (first %))
+       (d/q '[:find ?e :where [?e :bbox/min-x]] db)))
+
+(defn key-press []
+  (let [conn (state :conn)]
+    (install-and-print-tree conn 1)
+    (reset! (state :rects) (all-bbox (d/db conn)))))
+
+(defn setup-sketch []
+  (frame-rate 30)
+  (smooth)
+  (let [conn (create-and-connect-db uri "resources/datomic/schema.edn" 6 3)]
+    ;(install-and-bulk-load conn 50)
+    (set-state! :conn conn
+                :rects (atom []))))
+
+(defn draw-sketch []
+  (stroke 255)
+  (fill 255)
+  (rect 0 0 600 600)
+  (doseq [r (sort-by :node/is-leaf? @(state :rects))]
+    (no-fill)
+    (stroke-weight 1)
+    (cond
+     (:node/entry r) (stroke 0 0 255)
+     (:node/is-leaf? r) (do (stroke-weight 2) (stroke 255 0 0))
+     :else (stroke 50 255 225))
+    (rect (:bbox/min-x r) (:bbox/min-y r)
+          (- (:bbox/max-x r) (:bbox/min-x r)) (- (:bbox/max-y r) (:bbox/min-y r)))))
+
+(defn tree-sketch []
+  (sketch :title "R-tree"
+          :setup setup-sketch
+          :draw draw-sketch
+          :key-typed key-press
+          :size [600 600]))
