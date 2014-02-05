@@ -1,12 +1,20 @@
 (ns meridian.datomic-rtree.bbox)
 
+(defn bbox [x y w h]
+  {:bbox/max-x (+ x w) :bbox/min-x x
+   :bbox/max-y (+ y h) :bbox/min-y y})
+
 (defn extents [x1 y1 x2 y2]
   {:bbox/max-x (max x1 x2) :bbox/min-x (min x1 x2)
    :bbox/max-y (max y1 y2) :bbox/min-y (min y1 y2)})
 
 (defn area [{max-x :bbox/max-x min-x :bbox/min-x
-                  max-y :bbox/max-y min-y :bbox/min-y}]
+             max-y :bbox/max-y min-y :bbox/min-y}]
   (* (- max-x min-x) (- max-y min-y)))
+
+(defn centre [{max-x :bbox/max-x min-x :bbox/min-x
+               max-y :bbox/max-y min-y :bbox/min-y}]
+  [(* 0.5 (+ max-x min-x)) (* 0.5 (+ max-y min-y))])
 
 (defn union [bbox-a bbox-b]
   (let [{amax-x :bbox/max-x amin-x :bbox/min-x
