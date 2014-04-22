@@ -24,7 +24,7 @@
   [ents max-children min-children cost-fn n-splits]
   (apply concat
          (pmap #(cost-partition % max-children min-children cost-fn)
-               (partition (Math/round (double (/ (count ents) n-splits))) ents))))
+               (partition-all (Math/round (double (/ (count ents) n-splits))) ents))))
 
 (defn dyn-cost-partition
   ([ents max-children min-children cost-fn]
