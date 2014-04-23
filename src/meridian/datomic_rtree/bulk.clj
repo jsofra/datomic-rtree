@@ -24,7 +24,7 @@
   [ents max-children min-children cost-fn n-splits]
   (apply concat
          (pmap #(cost-partition % max-children min-children cost-fn)
-               (partition (Math/round (double (/ (count ents) n-splits))) ents))))
+               (partition-all (Math/round (double (/ (count ents) n-splits))) ents))))
 
 (defn dyn-cost-partition
   ([ents max-children min-children cost-fn]
@@ -43,14 +43,14 @@
 (defn create-levels [ents partition-fn max-children]
   (let [leaves (partition-fn ents)]
     (loop [levels [leaves] leaves? true]
-      (let [node #(cond-> (create-node %)
-                          leaves? (assoc :node/is-leaf? true))
-            nodes (map node (last levels))]
+      (let [node #(cond-> (create-node %2)
+                          %1 (assoc :node/is-leaf? true))
+            nodes (map (partial node leaves?) (last levels))]
         (if (> (count nodes) max-children)
           (recur (conj levels (partition-fn nodes)) false)
           (-> levels
               (conj nodes)
-              (conj [(node nodes)])))))))
+              (conj [(node false nodes)])))))))
 
 (defn bulk-tx [ents tree-id max-children min-children cost-fn]
   (let [partiioner #(dyn-cost-partition % max-children min-children cost-fn)
