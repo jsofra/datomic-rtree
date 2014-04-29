@@ -1,0 +1,67 @@
+[
+   ;; GeoJSON
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :type
+    :db/valueType :db.type/ref
+    ;:db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db] :db/ident :Feature}
+   {:db/id #db/id[:db.part/db] :db/ident :FeatureCollection}
+   {:db/id #db/id[:db.part/db] :db/ident :GeometryCollection}
+   {:db/id #db/id[:db.part/db] :db/ident :Point}
+   {:db/id #db/id[:db.part/db] :db/ident :LineString}
+   {:db/id #db/id[:db.part/db] :db/ident :Polygon}
+   {:db/id #db/id[:db.part/db] :db/ident :MultiPoint}
+   {:db/id #db/id[:db.part/db] :db/ident :MultiLineString}
+   {:db/id #db/id[:db.part/db] :db/ident :MultiPolygon}
+   
+   {:db/id #db/id[:db.part/db]
+    :db/ident :bbox
+    :db/valueType :db.type/string
+    :db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   
+   {:db/id #db/id[:db.part/db]
+    :db/ident :features
+    :db/valueType :db.type/ref
+    :db/isComponent true
+    :db/cardinality :db.cardinality/many
+    :db.install/_attribute :db.part/db}
+   
+   {:db/id #db/id[:db.part/db]
+    :db/ident :geometry
+    :db/valueType :db.type/ref
+    :db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :properties
+    :db/valueType :db.type/string
+    :db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   ;; geometry
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :coordinates
+    :db/valueType :db.type/string
+    :db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   ;; crs
+
+   {:db/id #db/id[:db.part/db]
+    :db/ident :crs
+    :db/valueType :db.type/ref
+    :db/isComponent true
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}   
+   
+   ]

@@ -94,23 +94,21 @@
             {:db/id new-root-id :node/children (node-ids split)})]))
 
 (defn insert-entry-tx [tree entry]
-  (let [new-entry (add-id entry)
-        leaf (-> (:rtree/root tree)
-                 (choose-leaf new-entry))]
-    (loop [node leaf
-           prev-node nil
-           split-nodes #{new-entry}
-           txs [new-entry]]
-      (let [parent (first (:node/_children node))
-            {:keys [split adjust]} (node-op node prev-node split-nodes new-entry tree)
-            txs (if split
-                  (concat txs (split-tx node split)
-                          (when (nil? parent)
-                            (grow-tree-tx (:db/id tree) split)))
-                  (conj txs adjust))]
-        (if parent
-          (recur parent node (or split #{}) txs)
-          txs)))))
+  (loop [node (-> (:rtree/root tree)
+                  (choose-leaf entry))
+         prev-node nil
+         split-nodes #{entry}
+         txs [entry]]
+    (let [parent (first (:node/_children node))
+          {:keys [split adjust]} (node-op node prev-node split-nodes entry tree)
+          txs (if split
+                (concat txs (split-tx node split)
+                        (when (nil? parent)
+                          (grow-tree-tx (:db/id tree) split)))
+                (conj txs adjust))]
+      (if parent
+        (recur parent node (or split #{}) txs)
+        txs))))
 
 (defn create-tree-tx [max-children min-children]
   [[:rtree/construct #db/id[:db.part/user] max-children min-children]])

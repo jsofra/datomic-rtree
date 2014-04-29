@@ -13,6 +13,8 @@ The implementation is a fairly vanilla implementation from the original Antonin 
 
 There is also an implementation of a parallel bulk-loading scheme using hilbert curves and a scoring mechanism similar to the one found in [Sort-based Parallel Loading of R-trees](http://www.mathematik.uni-marburg.de/~achakeye/publications/big_spatial_2012.pdf).
 
+Now includes schema for supporting insertion of Meridian [Shapes](http://github.com/jsofra/shapes) and [Features](http://github.com/jsofra/features)
+
 ## Todo
 
 This is currently only a exploration of the idea, there is a lot more to do.
@@ -21,7 +23,6 @@ This is currently only a exploration of the idea, there is a lot more to do.
 * Batch insertions
 * More search and query support
 * Investigate other R-trees; R* tree, R+ tree
-* Schema for supporting insertion of Meridian [Shapes](http://github.com/jsofra/shapes) and [Features](http://github.com/jsofra/features)
 * And lots, lots more.
 
 ## Usage

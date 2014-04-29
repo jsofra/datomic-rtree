@@ -1,6 +1,5 @@
 (ns meridian.datomic-rtree.rtree-test
   (:require [datomic.api :as d]
-            [clojure.pprint :as pp]
             [clojure.test :refer :all]
             [meridian.datomic-rtree.rtree :refer :all]
             [meridian.datomic-rtree.bbox :as bbox]))

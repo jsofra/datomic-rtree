@@ -86,7 +86,7 @@
 
    {:db/id #db/id[:db.part/db]
     :db/ident :node/entry
-    :db/valueType :db.type/string
+    :db/valueType :db.type/ref
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
