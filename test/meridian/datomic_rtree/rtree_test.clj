@@ -2,7 +2,8 @@
   (:require [datomic.api :as d]
             [clojure.test :refer :all]
             [meridian.datomic-rtree.rtree :refer :all]
-            [meridian.datomic-rtree.bbox :as bbox]))
+            [meridian.datomic-rtree.bbox :as bbox]
+            [meridian.datomic-rtree.test-utils :as utils]))
 
 (deftest bbox-area-test
   (are [bbox area] (== (bbox/area bbox) area)
@@ -77,3 +78,25 @@
             :bbox/max-x 500 :bbox/max-y 500}]
     (is (= (split-node #{n1 n2 n3 n4 n5 n6} 2)
            [#{n1 n2 n5 n6} #{n3 n4}]))))
+
+(defn all-entries [db]
+  (mapv #(d/entity db (first %))
+        (d/q '[:find ?e :where [?e :node/entry]] db)))
+
+(deftest test-tree-creation
+  (let [uri "datomic:mem://rtrees"
+        num-entries 100
+        conn (utils/create-and-connect-db uri
+                                          "resources/datomic/schema.edn"
+                                          "resources/datomic/geojsonschema.edn")]
+    (utils/create-tree-and-install-rand-data conn num-entries 6 3)
+    (is (= num-entries (count (all-entries (d/db conn)))))))
+
+(deftest test-bulk-tree-creation
+  (let [uri "datomic:mem://rtrees"
+        num-entries 100
+        conn (utils/create-and-connect-db uri
+                                          "resources/datomic/schema.edn"
+                                          "resources/datomic/geojsonschema.edn")]
+    (utils/install-and-bulk-load conn num-entries 6 3)
+    (is (= num-entries (count (all-entries (d/db conn)))))))

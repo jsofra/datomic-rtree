@@ -1,77 +1,15 @@
 (ns mem-tree
   (:use [datomic.api :only (q db) :as d]
         quil.core)
-  (:require [clojure.java.io :as io]
+  (:require [meridian.datomic-rtree.test-utils :as utils]
             [meridian.datomic-rtree.rtree :as rtree]
-            [meridian.datomic-rtree.bbox :as bbox]
-            [meridian.datomic-rtree.hilbert :as hilbert]
-            [meridian.datomic-rtree.bulk :as bulk]
-            [meridian.datomic-rtree.shapes :as shapes])
+            [meridian.datomic-rtree.bbox :as bbox])
   (:import datomic.Util))
 
 (def uri "datomic:mem://rtrees")
 
-(defn find-tree [db]
-  (->> (d/q '[:find ?e :where [?e :rtree/root]] db)
-       ffirst (d/entity db)))
-
-(defn create-and-connect-db [uri & schemas]
-  (d/delete-database uri)
-  (d/create-database uri)
-  (let [conn (d/connect uri)]
-    (doseq [schema schemas]
-      (->> (read-string (slurp schema))
-          (d/transact conn)))
-    conn))
-
-(defn rand-entries-old []
-  (let [hilbert-index (hilbert/index-fn 28 [0.0 600.0])]
-    (->> (repeatedly #(bbox/bbox (rand 540) (rand 540) (+ 10 (rand 50)) (+ 10 (rand 50))))
-         (map (fn [box]
-                (merge box
-                       {:node/entry (str (char (+ (rand-int 25) 65)))
-                        :node/hilbert-val (hilbert-index (bbox/centre box))}))))))
-
-(defn rand-entries []
-  (let [hilbert-index (hilbert/index-fn 28 [0.0 600.0])]
-    (->> (repeatedly #(bbox/bbox (rand 540) (rand 540) (+ 10 (rand 50)) (+ 10 (rand 50))))
-         (map (fn [box]
-                (let [{max-x :bbox/max-x min-x :bbox/min-x
-                       max-y :bbox/max-y min-y :bbox/min-y} box]
-                  (shapes/create-entry
-                   {:type :Feature
-                    :bbox [min-x min-y max-x max-y]
-                    :geometry {:type :Polygon
-                               :coordinates [[[min-x max-x] [max-x min-y]
-                                              [max-x max-y] [min-x max-y] [min-x max-x]]]}}
-                   hilbert-index)))))))
-
-(defn install-rand-data [conn num-entries]
-  (let [test-data (take num-entries (rand-entries))]
-    (time (doseq [entry test-data]
-            @(d/transact conn [[:rtree/insert-entry (find-tree (d/db conn)) entry]])))
-    :done))
-
-(defn install-rand-ents [conn num-entries]
-  (let [test-data (mapv #(assoc % :db/id (d/tempid :db.part/user))
-                        (take num-entries (rand-entries)))]
-    (time @(d/transact conn test-data))
-    :done))
-
-(defn create-tree-and-install-rand-data [conn num-entries max-children min-children]
-  @(d/transact conn (rtree/create-tree-tx max-children min-children))
-  (install-rand-data conn num-entries))
-
-(defn install-and-bulk-load [conn num-entries max-children min-children]
-  (install-rand-ents conn num-entries)
-  (let [ents (rtree/hilbert-ents (d/db conn))]
-    @(d/transact conn
-                 (bulk/bulk-tx ents #db/id[:db.part/user]
-                               max-children min-children bbox/area))
-    :done))
-
 (defn print-tree [conn]
-  (let [root (:rtree/root (find-tree (d/db conn)))]
+  (let [root (:rtree/root (utils/find-tree (d/db conn)))]
     ((fn walk [n indent]
        (println (str indent (:db/id n) " " (:node/entry n)))
        (doseq [c (:node/children n)]
@@ -79,13 +17,12 @@
      root "")))
 
 (defn install-and-print-tree [conn num-entries]
-  (install-rand-data conn num-entries)
+  (utils/install-rand-data conn num-entries)
   (print-tree conn))
 
 (defn all-entries [db]
   (map #(d/entity db (first %))
        (d/q '[:find ?e :where [?e :node/entry]] db)))
-
 
 (defn naive-intersecting [entries search-box]
   (into [] (filter #(bbox/intersects? search-box %) entries)))
@@ -109,18 +46,18 @@
     [?e :node/entry]])
 
 (comment
-  (def conn (create-and-connect-db uri
-                                   "resources/datomic/schema.edn"
-                                   "resources/datomic/geojsonschema.edn"))
-  (install-rand-data conn 1000)
-  (install-rand-ents conn 100)
-  (create-tree-and-install-rand-data conn 40 6 3)
+  (def conn (utils/create-and-connect-db uri
+                                         "resources/datomic/schema.edn"
+                                         "resources/datomic/geojsonschema.edn"))
+  (untils/install-rand-data conn 1000)
+  (utils/install-rand-ents conn 100)
+  (utils/create-tree-and-install-rand-data conn 40 6 3)
   (def search-box (bbox/extents 0.0 0.0 10.0 10.0))
   (def root (:rtree/root (find-tree (d/db conn))))
   (time (count (naive-intersecting (all-entries (d/db conn)) search-box)))
   (time (count (rtree/intersecting root search-box)))
   (time (count (d/q intersecting-q (d/db conn) search-rules (:db/id root) search-box)))
-  (time (install-and-bulk-load conn 10000 6 3))
+  (time (utils/install-and-bulk-load conn 10000 6 3))
   )
 
 ;;;;;; draw tree with quill ;;;;;;
@@ -137,11 +74,11 @@
 (defn setup-sketch []
   (frame-rate 30)
   (smooth)
-  (let [conn (create-and-connect-db uri
-                                    "resources/datomic/schema.edn"
-                                    "resources/datomic/geojsonschema.edn")]
-    ;(install-and-bulk-load conn 30 6 3)
-    (create-tree-and-install-rand-data conn 1 6 3)
+  (let [conn (utils/create-and-connect-db uri
+                                          "resources/datomic/schema.edn"
+                                          "resources/datomic/geojsonschema.edn")]
+    (utils/install-and-bulk-load conn 30 6 3)
+    ;(utils/create-tree-and-install-rand-data conn 1 6 3)
     (set-state! :conn conn
                 :rects (atom (all-bbox (d/db conn))))))
 
