@@ -53,8 +53,8 @@
               (conj [(node false nodes)])))))))
 
 (defn bulk-tx [ents tree-id max-children min-children cost-fn]
-  (let [partiioner #(dyn-cost-partition % max-children min-children cost-fn)
-        levels (create-levels ents partiioner max-children)
+  (let [partioner #(dyn-cost-partition % max-children min-children cost-fn)
+        levels (create-levels ents partioner max-children)
         ents (flatten (rest levels))]
     (conj ents {:db/id tree-id
                 :rtree/root (-> ents last :db/id)
