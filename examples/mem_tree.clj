@@ -49,7 +49,7 @@
   (def conn (utils/create-and-connect-db uri
                                          "resources/datomic/schema.edn"
                                          "resources/datomic/geojsonschema.edn"))
-  (untils/install-rand-data conn 1000)
+  (utils/install-rand-data conn 1000)
   (utils/install-rand-ents conn 100)
   (utils/create-tree-and-install-rand-data conn 40 6 3)
   (def search-box (bbox/extents 0.0 0.0 10.0 10.0))
@@ -77,8 +77,8 @@
   (let [conn (utils/create-and-connect-db uri
                                           "resources/datomic/schema.edn"
                                           "resources/datomic/geojsonschema.edn")]
-    (utils/install-and-bulk-load conn 30 6 3)
-    ;(utils/create-tree-and-install-rand-data conn 1 6 3)
+    ;(utils/install-and-bulk-load conn 30 6 3)
+    (utils/create-tree-and-install-rand-data conn 1 6 3)
     (set-state! :conn conn
                 :rects (atom (all-bbox (d/db conn))))))
 
