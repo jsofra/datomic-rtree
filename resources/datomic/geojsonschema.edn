@@ -4,7 +4,7 @@
    {:db/id #db/id[:db.part/db]
     :db/ident :type
     :db/valueType :db.type/ref
-    ;:db/isComponent true
+    :db/isComponent true
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
@@ -21,7 +21,6 @@
    {:db/id #db/id[:db.part/db]
     :db/ident :bbox
     :db/valueType :db.type/string
-    :db/isComponent true
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
    
@@ -42,7 +41,6 @@
    {:db/id #db/id[:db.part/db]
     :db/ident :properties
     :db/valueType :db.type/string
-    :db/isComponent true
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
@@ -51,7 +49,6 @@
    {:db/id #db/id[:db.part/db]
     :db/ident :coordinates
     :db/valueType :db.type/string
-    :db/isComponent true
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 

@@ -24,7 +24,7 @@
                                       :coordinates [[[100.0 0.0] [101.0 0.0]
                                                      [101.0 1.0] [100.0 1.0] [100.0 0.0]]]}
                            :properties {:prop0 "value0"
-                                        :prop1 {:this "that"}}}]}        
+                                        :prop1 1.0}}]}
         ent {:type :FeatureCollection
              :db/id 1
              :crs {:type :link
@@ -35,19 +35,24 @@
                          :geometry {:type :Point
                                     :db/id 1
                                     :coordinates "[102.0 0.5]\n"}
-                         :properties "{:prop0 \"value0\"}\n"}
+                         :properties {:db/id 1
+                                      :prop0 "value0"}}
                         {:type :Feature
                          :db/id 1
                          :geometry {:type :LineString
                                     :db/id 1
                                     :coordinates "[[102.0 0.0] [103.0 1.0] [104.0 0.0] [105.0 1.0]]\n"}
-                         :properties "{:prop0 \"value0\", :prop1 0.0}\n"}
+                         :properties {:db/id 1
+                                      :prop0 "value0"
+                                      :prop1 0.0}}
                         {:type :Feature
                          :db/id 1
                          :geometry {:type :Polygon
                                     :db/id 1
                                     :coordinates "[[[100.0 0.0] [101.0 0.0] [101.0 1.0] [100.0 1.0] [100.0 0.0]]]\n"}
-                         :properties "{:prop0 \"value0\", :prop1 {:this \"that\"}}\n"}]}]
+                         :properties {:db/id 1
+                                      :prop0 "value0"
+                                      :prop1 1.0}}]}]
     (is (= (->ent shape add-id) ent))))
 
 (deftest test-ent->shape
@@ -62,14 +67,16 @@
                            :geometry {:type :Point
                                       :db/id 1
                                       :coordinates [102.0 0.5]}
-                           :properties {:prop0 "value0"}}
+                           :properties {:db/id 1
+                                        :prop0 "value0"}}
                           {:type :Feature
                            :db/id 1
                            :geometry {:type :LineString
                                       :db/id 1
                                       :coordinates [[102.0 0.0] [103.0 1.0]
                                                     [104.0 0.0] [105.0 1.0]]}
-                           :properties {:prop0 "value0"
+                           :properties {:db/id 1
+                                        :prop0 "value0"
                                         :prop1 0.0}}
                           {:type :Feature
                            :db/id 1
@@ -77,8 +84,9 @@
                                       :db/id 1
                                       :coordinates [[[100.0 0.0] [101.0 0.0]
                                                      [101.0 1.0] [100.0 1.0] [100.0 0.0]]]}
-                           :properties {:prop0 "value0"
-                                        :prop1 {:this "that"}}}]}        
+                           :properties {:db/id 1
+                                        :prop0 "value0"
+                                        :prop1 1.0}}]}
         ent {:type :FeatureCollection
              :db/id 1
              :crs {:type :link
@@ -89,17 +97,22 @@
                          :geometry {:type :Point
                                     :db/id 1
                                     :coordinates "[102.0 0.5]\n"}
-                         :properties "{:prop0 \"value0\"}\n"}
+                         :properties {:db/id 1
+                                      :prop0 "value0"}}
                         {:type :Feature
                          :db/id 1
                          :geometry {:type :LineString
                                     :db/id 1
                                     :coordinates "[[102.0 0.0] [103.0 1.0] [104.0 0.0] [105.0 1.0]]\n"}
-                         :properties "{:prop0 \"value0\", :prop1 0.0}\n"}
+                         :properties {:db/id 1
+                                      :prop0 "value0"
+                                      :prop1 0.0}}
                         {:type :Feature
                          :db/id 1
                          :geometry {:type :Polygon
                                     :db/id 1
                                     :coordinates "[[[100.0 0.0] [101.0 0.0] [101.0 1.0] [100.0 1.0] [100.0 0.0]]]\n"}
-                         :properties "{:prop0 \"value0\", :prop1 {:this \"that\"}}\n"}]}]
+                         :properties {:db/id 1
+                                      :prop0 "value0"
+                                      :prop1 1.0}}]}]
     (is (= (->shape ent) shape))))
