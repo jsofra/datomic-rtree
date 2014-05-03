@@ -68,9 +68,10 @@
   (let [split-children (-> (:node/children node)
                            (disj old-child)
                            (clojure.set/union (set new-children))
-                           (split-node min-children))
-        bboxes (map (comp id-adder bbox/group) split-children)]
-    (map #(assoc %1 :node/children %2) bboxes split-children)))
+                           (split-node min-children))]
+    (map #(-> % bbox/group
+              id-adder
+              (assoc :node/children %)) split-children)))
 
 (defn adjusted-node [node entry new-children]
   (cond-> (assoc (bbox/union entry node) :db/id (:db/id node))
@@ -81,17 +82,23 @@
     (conj (map #(assoc % :node/children (node-ids (:node/children %))) split)
           [:db.fn/retractEntity (:db/id node)])))
 
-(defn node-op [node prev-node split-nodes entry
-               {max-children :rtree/max-children min-children :rtree/min-children}]
-  (if (and (= (count (:node/children node)) max-children) (seq split-nodes))
-    {:split (new-splits node prev-node split-nodes min-children add-id)}
-    {:adjust (adjusted-node node entry split-nodes)}))
-
 (defn grow-tree-tx [tree-id split]
   (let [new-root-id (d/tempid :db.part/user)]
     [[:db/add tree-id :rtree/root new-root-id]
      (merge (bbox/group split)
             {:db/id new-root-id :node/children (node-ids split)})]))
+
+(defn should-split? [node split-nodes {max-children :rtree/max-children}]
+  (and (= (count (:node/children node)) max-children)
+       (seq split-nodes)))
+
+(defn add-split-tx [txs parent? node new-splits tree]
+  (concat txs (split-tx node new-splits)
+          (when parent?
+            (grow-tree-tx (:db/id tree) new-splits))))
+
+(defn add-adjust-tx [txs node entry split-nodes]
+  (conj txs (adjusted-node node entry split-nodes)))
 
 (defn insert-entry-tx [tree entry]
   (loop [node (-> (:rtree/root tree)
@@ -100,15 +107,15 @@
          split-nodes #{entry}
          txs [entry]]
     (let [parent (first (:node/_children node))
-          {:keys [split adjust]} (node-op node prev-node split-nodes entry tree)
-          txs (if split
-                (concat txs (split-tx node split)
-                        (when (nil? parent)
-                          (grow-tree-tx (:db/id tree) split)))
-                (conj txs adjust))]
+          new-split-nodes (delay (new-splits node prev-node split-nodes
+                                             (:rtree/min-children tree) add-id))
+          split? (should-split? node split-nodes tree)
+          new-txs (if split?
+                    (add-split-tx txs (nil? parent) node @new-split-nodes tree)
+                    (add-adjust-tx txs node entry split-nodes))]
       (if parent
-        (recur parent node (or split #{}) txs)
-        txs))))
+        (recur parent node (if split? @new-split-nodes #{}) new-txs)
+        new-txs))))
 
 (defn create-tree-tx [max-children min-children]
   [[:rtree/construct #db/id[:db.part/user] max-children min-children]])
