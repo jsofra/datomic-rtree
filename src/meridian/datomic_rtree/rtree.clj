@@ -154,5 +154,5 @@
                     recur-search-step))))
 
 (defn hilbert-ents [db]
-  (->> (d/seek-datoms db :avet :node/hilbert-val)
+  (->> (d/seek-datoms db :avet :bbox/hilbert-val)
        (map #(d/entity db (:e %)))))

@@ -51,5 +51,5 @@
     (rtree/add-id
      (merge box
             {:node/entry (->ent shape)
-             :node/hilbert-val (index-fn (bbox/centre box))}))))
+             :bbox/hilbert-val (index-fn (bbox/centre box))}))))
  
