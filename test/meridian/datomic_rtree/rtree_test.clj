@@ -77,7 +77,7 @@
         n6 {:bbox/min-x 20 :bbox/min-y 20
             :bbox/max-x 500 :bbox/max-y 500}]
     (is (= (split-node #{n1 n2 n3 n4 n5 n6} 2)
-           [#{n1 n2 n5 n6} #{n3 n4}]))))
+           [#{n3 n4} #{n1 n2 n5 n6}]))))
 
 (defn all-entries [db]
   (mapv #(d/entity db (first %))

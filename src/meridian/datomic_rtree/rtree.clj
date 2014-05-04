@@ -1,6 +1,7 @@
 (ns meridian.datomic-rtree.rtree
   (:use [datomic.api :only (q db) :as d])
-  (:require [meridian.datomic-rtree.bbox :as bbox]))
+  (:require [meridian.datomic-rtree.bbox :as bbox])
+  (:require [clojure.core.reducers :as r]))
 
 (defn choose-leaf
   "Select a leaf node in which to place a new index entry, new-bbox.
@@ -41,22 +42,29 @@
     (let [bbox (bbox/group group)]
       [(bbox/enlargement bbox node) (bbox/area bbox) (count group)])))
 
+(defn split-accum [init-groups children]
+  (iterate (fn [[[group1 group2 :as groups] remaining]]
+             (let [picked (pick-next group1 group2 remaining)
+                   [group1 group2] (sort-by (group-chooser picked) groups)]
+               [(sort-by count [(conj group1 picked) group2])
+                (disj remaining picked)]))
+           [init-groups children]))
+
+(defn split-finished? [min-children [groups remaining]]
+  (and (seq remaining)
+       (> (+ (count remaining) (count (first groups))) min-children)))
+
 (defn split-node [children min-children]
   "Quadractic-Cost Algorithm. Attempts to find a small-area split.
    Given a set of children (and a minimum number of children allowed in a node),
    returns a vector containing two new sets of child nodes."
-  (let [[seed-a seed-b] (pick-seeds children)]
-    (loop [groups [#{seed-a} #{seed-b}]
-           remaining (disj children seed-a seed-b)]
-      (if (empty? remaining)
-        groups
-        (let [[first-group second-group] (sort-by count groups)]
-          (if (<= (+ (count remaining) (count first-group)) min-children)
-            [(clojure.set/union first-group remaining) second-group]
-            (let [picked (pick-next first-group second-group remaining)
-                  [first-group second-group] (sort-by (group-chooser picked) groups)]
-              (recur [(conj first-group picked) second-group]
-                     (disj remaining picked)))))))))
+  (let [[seed-a seed-b] (pick-seeds children)
+        split-seq (split-accum [#{seed-a} #{seed-b}] (disj children seed-a seed-b))
+        final (first (drop-while (partial split-finished? min-children) split-seq))
+        [[group1 group2 :as groups] remaining] final]
+    (if (empty? remaining)
+      groups
+      [(clojure.set/union group1 remaining) group2])))
 
 ;; convert the tree adjustments into transactions
 
