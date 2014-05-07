@@ -3,7 +3,8 @@
         quil.core)
   (:require [meridian.datomic-rtree.test-utils :as utils]
             [meridian.datomic-rtree.rtree :as rtree]
-            [meridian.datomic-rtree.bbox :as bbox])
+            [meridian.datomic-rtree.bbox :as bbox]
+            [meridian.datomic-rtree.bulk :as bulk])
   (:import datomic.Util))
 
 (def uri "datomic:mem://rtrees")
@@ -17,7 +18,7 @@
      root "")))
 
 (defn install-and-print-tree [conn num-entries]
-  (utils/install-rand-data conn num-entries)
+  (utils/install-rand-data conn num-entries utils/create-feature)
   (print-tree conn))
 
 (defn all-entries [db]
@@ -49,8 +50,8 @@
   (def conn (utils/create-and-connect-db uri
                                          "resources/datomic/schema.edn"
                                          "resources/datomic/geojsonschema.edn"))
-  (utils/install-rand-data conn 1000)
-  (utils/install-rand-ents conn 100)
+  (utils/install-rand-data conn 1000 utils/create-feature)
+  (utils/install-rand-ents conn 1000 utils/create-feature)
   (utils/create-tree-and-install-rand-data conn 40 6 3)
   (def search-box (bbox/extents 0.0 0.0 10.0 10.0))
   (def root (:rtree/root (find-tree (d/db conn))))
@@ -77,8 +78,13 @@
   (let [conn (utils/create-and-connect-db uri
                                           "resources/datomic/schema.edn"
                                           "resources/datomic/geojsonschema.edn")]
-    ;(utils/install-and-bulk-load conn 30 6 3)
-    (utils/create-tree-and-install-rand-data conn 1 6 3)
+    #_(do (utils/install-rand-ents conn 30 utils/create-feature)
+          (utils/bulk-load-ents conn 6 3 bulk/dyn-cost-partition))
+
+    (do (utils/create-tree conn 6 3)
+        (utils/install-rand-ents conn 1 utils/create-feature)
+        (utils/load-ents conn 6 3))
+
     (set-state! :conn conn
                 :rects (atom (all-bbox (d/db conn))))))
 
@@ -91,9 +97,9 @@
     (no-fill)
     (stroke-weight 1)
     (cond
-     (:node/entry r) (stroke 0 0 255)
-     (:node/is-leaf? r) (do (stroke-weight 2) (stroke 255 0 0))
-     :else (stroke 50 255 225))
+     (:node/entry r) (do (stroke-weight 2) (stroke 0 0 256))
+     (:node/is-leaf? r) (do (stroke-weight 2) (stroke 256 0 0))
+     :else (do (stroke-weight 2) (stroke 20 180 200)))
     (rect (:bbox/min-x r) (:bbox/min-y r)
           (- (:bbox/max-x r) (:bbox/min-x r)) (- (:bbox/max-y r) (:bbox/min-y r)))))
 

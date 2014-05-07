@@ -89,7 +89,9 @@
         conn (utils/create-and-connect-db uri
                                           "resources/datomic/schema.edn"
                                           "resources/datomic/geojsonschema.edn")]
-    (utils/create-tree-and-install-rand-data conn num-entries 6 3)
+    (utils/create-tree conn 6 3)
+    (utils/install-rand-ents conn num-entries utils/create-feature)
+    (utils/load-ents conn 6 3)
     (is (= num-entries (count (all-entries (d/db conn)))))))
 
 (deftest test-bulk-tree-creation
@@ -98,5 +100,6 @@
         conn (utils/create-and-connect-db uri
                                           "resources/datomic/schema.edn"
                                           "resources/datomic/geojsonschema.edn")]
-    (utils/install-and-bulk-load conn num-entries 6 3)
+    (utils/install-rand-ents conn num-entries utils/create-feature)
+    (utils/bulk-load-ents conn 6 3)
     (is (= num-entries (count (all-entries (d/db conn)))))))
