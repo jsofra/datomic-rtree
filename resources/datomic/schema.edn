@@ -81,6 +81,14 @@
      :code (rtree/insert-entry-tx tree entry)}}
 
    {:db/id #db/id[:db.part/user]
+    :db/ident :rtree/insert-and-install-entry
+    :db/fn #db/fn
+    {:lang "clojure"
+     :requires [[meridian.datomic-rtree.rtree :as rtree]]
+     :params [db tree entry]
+     :code (rtree/insert-entry-tx tree entry :install-entry true)}}
+
+   {:db/id #db/id[:db.part/user]
     :db/ident :rtree/bulk-load
     :db/fn #db/fn
     {:lang "clojure"

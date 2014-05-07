@@ -27,22 +27,29 @@
                            (bbox/area e2)))]
     (apply max-key innefficiency pairs)))
 
-(defn pick-next [group-a group-b nodes]
+(defn pick-next
   "Select one remaining entry for classification in a group.
    Determine the cost of putting each entry in each group.
    Find the entry with greatest preference for one group."
+  [group-a group-b nodes]
   (let [bboxes (map bbox/group [group-a group-b])
         cost-diff (fn [node]
                     (let [enlargements (map (bbox/enlargement-fn node) bboxes)]
                       (Math/abs (apply - enlargements))))]
     (apply max-key cost-diff nodes)))
 
-(defn group-chooser [node]
+(defn group-chooser
+  "For any given node returns a function that given a group will
+   return a value that can be used as a sort order for the group."
+  [node]
   (fn [group]
     (let [bbox (bbox/group group)]
       [(bbox/enlargement bbox node) (bbox/area bbox) (count group)])))
 
-(defn split-accum [init-groups children]
+(defn split-accum
+  "Produces a lazy seq of vectors containing a list of groups (that accumulate
+   at every step) and a list of children yet to be grouped at that step."
+  [init-groups children]
   (iterate (fn [[[group1 group2 :as groups] remaining]]
              (let [picked (pick-next group1 group2 remaining)
                    [group1 group2] (sort-by (group-chooser picked) groups)]
@@ -54,10 +61,11 @@
   (and (seq remaining)
        (> (+ (count remaining) (count (first groups))) min-children)))
 
-(defn split-node [children min-children]
+(defn split-node
   "Quadractic-Cost Algorithm. Attempts to find a small-area split.
    Given a set of children (and a minimum number of children allowed in a node),
    returns a vector containing two new sets of child nodes."
+  [children min-children]
   (let [[seed-a seed-b] (pick-seeds children)
         split-seq (split-accum [#{seed-a} #{seed-b}] (disj children seed-a seed-b))
         final (first (drop-while (partial split-finished? min-children) split-seq))
@@ -108,12 +116,12 @@
 (defn add-adjust-tx [txs node entry split-nodes]
   (conj txs (adjusted-node node entry split-nodes)))
 
-(defn insert-entry-tx [tree entry]
+(defn insert-entry-tx [tree entry & {:keys [install-entry] :or {install-entry false}}]
   (loop [node (-> (:rtree/root tree)
                   (choose-leaf entry))
          prev-node nil
          split-nodes #{entry}
-         txs [entry]]
+         txs (if install-entry [entry] [])]
     (let [parent (first (:node/_children node))
           new-split-nodes (delay (new-splits node prev-node split-nodes
                                              (:rtree/min-children tree) add-id))
@@ -150,9 +158,10 @@
                (fn [children]
                  (filter #(bbox/intersects? search-box %) children))))
 
-(defn containing [root search-box]
+(defn containing
   "Given the root of the tree and a bounding box to search within finds entries
    contained within the search box."
+  [root search-box]
   (search-tree root
                (fn [children]
                  (filter #(bbox/contains? search-box %) children))
@@ -163,4 +172,5 @@
 
 (defn hilbert-ents [db]
   (->> (d/seek-datoms db :avet :bbox/hilbert-val)
-       (map #(d/entity db (:e %)))))
+       (map #(d/entity db (:e %)))
+       (filter :bbox/hilbert-val)))
